@@ -5,7 +5,7 @@ sbgarchitecture.Entity.initDatatype()
 sbgarchitecture.Relationship.initDatatype()
 sbgarchitecture.Trait.initDatatype()
 
-exit_words = ["cancel", "stop", "exit"]
+exit_words = ["cancel", "exit"]
 binary_mapping = {"y":1, "yes":1, "n":0, "no":0}
 
 def checkBinary(response_check, exit_check):#Checks a Y/N prompt
@@ -127,36 +127,41 @@ def removePluralAspectEntry(target_instance, target_aspect, target_entry, editor
 	else:
 		print("Deletion cancelled.")
 def changePluralAspectEntry(target_instance, target_aspect, target_entry, editor):
-
-
-def aspectWorkspace(target_instance, target_aspect):
-
-def moveToAspectWorkspace(target_instance):
-	aspect_loop = True
-	while aspect_loop:
-		print(f"You are editing the aspects of {target_instance.aspects['readable_name']}. Type the name of one of the below aspects to move to it.")
-		for i in target_instance.aspects:
-			if i not in target_instance.immutables:
-
-
-def firstTimeSetup(): #TODO make less hardcoded.
-	continue_loop = True
-	while continue_loop: #TOCHECK Maybe there's a better way to do this flow control
-		print("This will set up all information necessary to use Panocular. Doing so will wipe any data that already exists. Continue?")
-		response = input("(Y/N): ")
-		if checkBinary(response, False) == 0:
-			sys.exit("First time set up cancelled.")
-		creation_dict = dict()
-		creation_dict["existence_trust"] = 1.0
-		creation_dict["self_trust"] = 1.0
-		try:
-			creation_dict["name"] = createSingularAspect(sbgarchitecture.Entity, "name", "the current user")
-			sbgarchitecture.Entity(creation_dict, True, True, False)
-			continue_loop = False
-		except TypeError:
-			print("Invalid type")
-	loader.writeAllJSONData()
-	print("All data created successfully.")
+	try:
+		if type(target_instance.aspects[target_aspect]) == type(dict()): #TOCHECK see if dicts will ever have a value that is not trust
+			target_entry_readable = target_entry
+		elif type(target_instance.aspects[target_aspect]) == type(list()):
+			target_entry_readable = target_instance.aspects[target_aspect][target_entry]
+		print(f"You will change '{target_entry_readable}' from {target_instance.aspects['readable_name']}'s {target_instance.aspect_blueprint[target_aspect][4]} aspect.")
+		print("What would you like to change it to?")
+		new_entry = input()
+		print(f"You will change '{target_entry_readable}' to '{new_entry}'.")
+		if checkSure(True):
+			print("Changing...")		
+			target_instance.updateAspect(target_aspect, new_entry, editor, False, target_entry)
+			print("Successfully changed entry.")
+		else:
+			print("Operation cancelled.")
+	except Exception:
+		print("Permissions invalid. Operation cancelled.")
+	except KeyError:
+		print("No such key. Operation cancelled.")
+def changeSingularAspect(target_instance, target_aspect, editor):
+	try: #TODO don't repeat yourself?
+		print(f"You will change '{target_instance.aspects[target_aspect]}' in {target_instance.aspects['readable_name']}'s {target_instance.aspect_blueprint[target_aspect][4]} aspect.")
+		print("What would you like to change it to?")
+		new_entry = input()
+		print(f"You will change '{target_instance.aspects[target_aspect]}' to '{new_entry}'.")
+		if checkSure(True):
+			print("Changing...")
+			target_instance.updateAspect(target_aspect, new_entry, editor, False, None)
+			print("Successfully changed entry.")
+		else:
+			print("Operation cancelled.")
+	except Exception:
+		print("Permissions invalid. Operation cancelled.")
+	except KeyError:
+		print("No such key. Operation cancelled.")/
 
 def listTypes():
 	print("These are all registered types:")
@@ -189,10 +194,27 @@ def detailPluralAspect(target_instance, target_aspect): #Gives more information 
 		elif type(target_instance.aspect_blueprint[target_aspect][0]) == type(dict()): #Looking for dicts. Could have an issue if I ever have dicts with values of hexdigests
 			print(f"{to_print}: {target_instance.aspects[target_aspect][i]}")
 
+def firstTimeSetup(): #TODO make less hardcoded.
+	continue_loop = True
+	while continue_loop: #TOCHECK Maybe there's a better way to do this flow control
+		print("This will set up all information necessary to use Panocular. Doing so will wipe any data that already exists. Continue?")
+		response = input("(Y/N): ")
+		if checkBinary(response, False) == 0:
+			sys.exit("First time set up cancelled.")
+		creation_dict = dict()
+		creation_dict["existence_trust"] = 1.0
+		creation_dict["self_trust"] = 1.0
+		try:
+			creation_dict["name"] = createSingularAspect(sbgarchitecture.Entity, "name", "the current user")
+			sbgarchitecture.Entity(creation_dict, True, True, False)
+			continue_loop = False
+		except TypeError:
+			print("Invalid type")
+	loader.writeAllJSONData()
+	print("All data created successfully.")
 for i in loader.all_datatypes:
 	if os.path.exists(f"JSONData/{i.subglobal_type}.json") == False:
 		print("Invalid data detected. Moving on to first time set up...")
 		firstTimeSetup()
-
 loader.loadAllJSONData()
 print("Data loaded. Moving to main prompt...")
