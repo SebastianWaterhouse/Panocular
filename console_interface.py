@@ -1,12 +1,18 @@
 import sbgarchitecture, loader
 import os, sys
 
+class MoveUp(Exception):
+	pass
+
 sbgarchitecture.Entity.initDatatype()
 sbgarchitecture.Relationship.initDatatype()
 sbgarchitecture.Trait.initDatatype()
 
+editor = str()
+
 exit_words = ["cancel", "exit"]
 binary_mapping = {"y":1, "yes":1, "n":0, "no":0}
+
 
 def checkBinary(response_check, exit_check):#Checks a Y/N prompt
 	if response_check.lower() in binary_mapping:
@@ -40,6 +46,47 @@ def checkGo(response_go):#Checks to keep going in the creation of a plural aspec
 		checkSure(True)
 	else:
 		return True
+
+def listTypes():
+	print("These are all registered types:")
+	for i in loader.all_datatypes:
+		print(i.subglobal_type)
+def listInstancesByType(target_type):
+	print(f"These are all instances of type {target_type.subglobal_type} found:")
+	for i in target_type.target_registry:
+		print(target_type.target_registry[i].aspects["readable_name"])
+def outlineAspects(target_instance):
+	print(f"The aspects of {target_instance.aspects['readable_name']} are as follows:")
+	for i in target_instance.aspects:
+		if target_instance.aspect_blueprint[i][2]:
+			if target_instance.aspect_blueprint[i][3] == None:
+				to_print = target_instance.aspects[i]
+			else:
+				to_print = target_instance.aspect_blueprint[i][3][target_instance.aspects[i][0]].aspects["readable_name"]
+			print(f"{target_instance.subglobal_type.capitalize()} {target_instance.aspects['readable_name']}'s {target_instance.aspect_blueprint[4]} is {to_print}")
+		else:
+			print(f"{target_instance.subglobal_type.capitalize()} {target_instance.aspects['readable_name']} has {len(target_instance.aspects[i][0])} {target_instance.aspect_blueprint[i][4]}")
+def detailPluralAspect(target_instance):
+	print(f"{target_instance.aspects['readable_name'].capitalize()} has these plural aspects:")
+	for i in target_instance.aspects:
+		if target_instance.aspect_blueprint[i][2] == False:
+			print(f"{target_instance.subglobal_type.capitalize()} {target_instance.aspects['readable_name']} has {len(target_instance.aspects[i][0])} {target_instance.aspect_blueprint[i][4]}")
+	print("Please enter which one you would like to view.")
+	view_entry = input()
+	try:
+		target_aspect = target_instance.aspects[view_entry]
+		print(f"{target_instance.subglobal_type.capitalize()} {target_instance.aspects['readable_name']} has {target_instance.aspect_blueprint[target_aspect][4].lower()} as follows:")
+		for i in target_instance.aspects[target_aspect]:
+			if target_instance.aspect_blueprint[target_aspect][3] == None:
+				to_print = i
+			else:
+				to_print = target_instance.aspect_blueprint[target_aspect][3][i].aspects["readable_name"]
+			if type(target_instance.aspect_blueprint[target_aspect][0]) == type(list()):
+				print(to_print)
+			elif type(target_instance.aspect_blueprint[target_aspect][0]) == type(dict()): #Looking for dicts. Could have an issue if I ever have dicts with values of hexdigests
+				print(f"{to_print}: {target_instance.aspects[target_aspect][i]}")
+	except NameError:
+		print("Invalid aspect. Cancelling operation.")
 
 def createPluralAspect(target_instance, target_aspect, readable_name, target_trust,):
 	if type(target_instance.aspect_blueprint[target_aspect][0]) == type(list()):
@@ -91,8 +138,19 @@ def createNewInstance(target_type, own_registrar, **kwargs): #All required infor
 		if checkSure(True):
 			new_instance_loop = False
 	target_type(return_source_dict, True, own_registrar, False)
+def destroyInstance(target_instance): #TODO security
+	print(f"You will delete {target_instance.aspects['readable_name']}")
+	if checkSure(True):
+		print("Make sure that you are REALLY sure about this. This is an irreversible action if saved.")
+		if checkSure(True):
+			target_instance.deleteInstance()
+			raise ZeroDivisionError
+		else:
+			print("Cancelling.")
+	else:
+		print("Cancelling.")
 
-def addPluralAspectEntry(target_instance, target_aspect, editor, trust):
+def addPluralAspectEntry(target_instance, target_aspect, trust):
 	plural_entry_loop = True
 	while plural_entry_loop:
 		print(f"What would you like to add to {target_instance.aspects['readable_name']}'s {target_instance.aspect_blueprint[target_aspect][4]} aspect?")
@@ -115,7 +173,7 @@ def addPluralAspectEntry(target_instance, target_aspect, editor, trust):
 		else:
 			plural_entry_loop = False
 			print("Entry completed.")
-def removePluralAspectEntry(target_instance, target_aspect, target_entry, editor):
+def removePluralAspectEntry(target_instance, target_aspect, target_entry):
 	print(f"You will remove entry '{target_entry}' from {target_instance.aspects["readable_name"]}'s {target_instance.aspect_blueprint[target_aspect][4]} aspect.")
 	if checkSure(True):
 		print("Deleting...")
@@ -126,7 +184,7 @@ def removePluralAspectEntry(target_instance, target_aspect, target_entry, editor
 			print("Permissions error.")
 	else:
 		print("Deletion cancelled.")
-def changePluralAspectEntry(target_instance, target_aspect, target_entry, editor):
+def changePluralAspectEntry(target_instance, target_aspect, target_entry): #TODO let Ibrahim make these two functions one
 	try:
 		if type(target_instance.aspects[target_aspect]) == type(dict()): #TOCHECK see if dicts will ever have a value that is not trust
 			target_entry_readable = target_entry
@@ -146,7 +204,7 @@ def changePluralAspectEntry(target_instance, target_aspect, target_entry, editor
 		print("Permissions invalid. Operation cancelled.")
 	except KeyError:
 		print("No such key. Operation cancelled.")
-def changeSingularAspect(target_instance, target_aspect, editor):
+def changeSingularAspect(target_instance, target_aspect):
 	try: #TODO don't repeat yourself?
 		print(f"You will change '{target_instance.aspects[target_aspect]}' in {target_instance.aspects['readable_name']}'s {target_instance.aspect_blueprint[target_aspect][4]} aspect.")
 		print("What would you like to change it to?")
@@ -161,38 +219,99 @@ def changeSingularAspect(target_instance, target_aspect, editor):
 	except Exception:
 		print("Permissions invalid. Operation cancelled.")
 	except KeyError:
-		print("No such key. Operation cancelled.")/
+		print("No such key. Operation cancelled.")
 
-def listTypes():
-	print("These are all registered types:")
-	for i in loader.all_datatypes:
-		print(i.subglobal_type)
-def listInstancesByType(target_type):
-	print(f"These are all instances of type {target_type.subglobal_type} found:")
-	for i in target_type.target_registry:
-		print(target_type.target_registry[i].aspects["readable_name"])
-def outlineAspectsConsole(target_instance):
-	print(f"The aspects of {target_instance.aspects['readable_name']} are as follows:")
-	for i in target_instance.aspects:
-		if target_instance.aspect_blueprint[i][2]:
-			if target_instance.aspect_blueprint[i][3] == None:
-				to_print = target_instance.aspects[i]
-			else:
-				to_print = target_instance.aspect_blueprint[i][3][target_instance.aspects[i][0]].aspects["readable_name"]
-			print(f"{target_instance.subglobal_type.capitalize()} {target_instance.aspects['readable_name']}'s {target_instance.aspect_blueprint[4]} is {to_print}")
+workspaces = dict()
+def workspaceList():
+	print("Listing available workspaces...")
+	for i in workspaces:
+		print(i)
+def workspaceMove():
+	print("Which workspace would you like to move to? Use 'up' to return to the previous workspace. Use 'list' to list all available workspaces.")
+	to_move = input().lower()
+	try:
+		if to_move == "up":
+			raise MoveUp
+		elif to_move == "list":
+			workspaceList()
+		eval(f"{workspaces[to_move]}({editor})")
+	except NameError:
+		print("Invalid workspace.")
+def workspaceHelp(target_workspace):
+	print("Listing available help...")
+	for i in target_workspace.commands:
+		print(f"{i}: {target_workspace.commands[i][1]}")
+def workspaceSelectInstance(target_type):
+	print("Please enter the full hexdigest of your selected instance.")
+	target_instance = input()
+	try:
+		InstanceWorkspace(eval(f"{target_type}.target_registry.{target_instance}"))
+def workspaceSelectAspect(target_instance):
+	print("Please choose which aspect you will edit.")
+	to_edit = input()
+	try:
+		if target_instance.aspect_blueprint[to_edit][2]:
+			changeSingularAspect(target_instance, to_edit)
 		else:
-			print(f"{target_instance.subglobal_type.capitalize()} {target_instance.aspects['readable_name']} has {len(target_instance.aspects[i][0])} {target_instance.aspect_blueprint[i][4]}")
-def detailPluralAspect(target_instance, target_aspect): #Gives more information on one of the plural aspects of a subglobal TODO check working
-	print(f"{target_instance.subglobal_type.capitalize()} {target_instance.aspects['readable_name']} has {target_instance.aspect_blueprint[target_aspect][4].lower()} as follows:")
-	for i in target_instance.aspects[target_aspect]:
-		if target_instance.aspect_blueprint[target_aspect][3] == None:
-			to_print = i
-		else:
-			to_print = target_instance.aspect_blueprint[target_aspect][3][i].aspects["readable_name"]
-		if type(target_instance.aspect_blueprint[target_aspect][0]) == type(list()):
-			print(to_print)
-		elif type(target_instance.aspect_blueprint[target_aspect][0]) == type(dict()): #Looking for dicts. Could have an issue if I ever have dicts with values of hexdigests
-			print(f"{to_print}: {target_instance.aspects[target_aspect][i]}")
+			AspectWorkspace()
+	except NameError:
+		print("Invalid aspect. Operation cancelled.")
+def workspaceMainLoop(command_registry):
+	main_continue = True
+		while main_continue:
+			print("Input a command: ")
+			to_execute = input().lower()
+			try:
+				if to_execute in self.commands:
+					self.commands[to_execute][0]
+				else:
+					print("Command not recognized.")
+			except ZeroDivisionError:
+				main_continue = False
+
+class Workspace(): #TOCHECK quirky or no
+	def __init__(self):
+		self.commands = dict() #<name of command (str)>:(<function to call>, <help description (str)>)
+		self.commands["move"] = (workspaceMove(), "Moves you to another workspace.")
+		self.commands["exit"] = (lambda: 1/0, "Exits the prompt.")
+		self.commands["help"] = (workspaceHelp(eval('self.commands')), "Provides help for all functions in current workspace.")
+class GlobalWorkspace(Workspace):
+	workspaces["global"] = "GlobalWorkspace"
+	def __init__(self):
+		super(GlobalWorkspace, self).__init__()
+		self.commands["list"] = (listTypes(), "Lists all subglobal types.")
+		workspaceMainLoop(self.commands)
+class TypeWorkspace(Workspace):
+	editor_trust = float() #TOCHECK jankalicious
+	def __init__(self, parent_type):
+		super(TypeWorkspace, self).__init__()
+		self.parent_type = parent_type
+		self.commands["create"] = (createNewInstance(self.parent_type, False, editor_trust), f"Enters the prompt to create a new {cls.parent_type.subglobal_type.lower()} instance.")
+		self.commands["list"] = (listInstancesByType(self.parent_type), f"Lists all instances of type {cls.parent_type.subglobal_type.lower()}.")
+		self.commands["edit"] = (workspaceSelectInstance(self.parent_type), f"Allows you to enter an instance's workspace.")
+class TypeEntityWorkspace(TypeWorkspace):
+	workspaces["entity"] = "TypeEntityWorkspace"
+	def __init__(self):
+		super(TypeEntityWorkspace, self).__init__(sbgarchitecture.Entity)
+		workspaceMainLoop(self.commands)
+class TypeRelationshipWorkspace(TypeWorkspace):
+	workspaces["relationship"] = "TypeRelationshipWorkspace"
+	def __init__(self):
+		super(TypeRelationshipWorkspace, self).__init__(sbgarchitecture.Relationship)
+		workspaceMainLoop(self.commands)
+class TypeTraitWorkspace(TypeWorkspace):
+	workspaces["trait"] = "TypeTraitWorkspace"
+	def __init__(self):
+		super(TypeTraitWorkspace, self).__init__(sbgarchitecture.Trait)
+		workspaceMainLoop(self.commands)
+class InstanceWorkspace(Workspace):
+	def __init__(self, target_instance):
+		super(InstanceWorkspace, self).__init__()
+		self.target_instance = target_instance
+		self.commands["delete"] = (destroyInstance(self.target_instance), "Will delete the current instance. Irreversible.")
+		self.commands["aspectlist"] = (outlineAspects(self.target_instance), "Outlines the aspects of the current instance.")
+		self.commands["aspectdetail"] = (detailPluralAspect(self.target_instance), "Details constituents of specified aspect.")
+		self.commands["edit"] = (workspaceSelectAspect(self.target_instance), "Allows editing of aspects.")
 
 def firstTimeSetup(): #TODO make less hardcoded.
 	continue_loop = True

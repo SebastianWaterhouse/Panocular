@@ -100,7 +100,7 @@ class SubglobalData(): #Each of the subglobal datatypes is a subclass
 				if plural_index in self.aspects[target_aspect]:
 					self.aspects[target_aspect][plural_index] = new_value
 				else:
-			 		raise IndexError()
+			 		raise IndexError
 		except Exception:
 			raise Exception("PermsError")
 		except KeyError:
